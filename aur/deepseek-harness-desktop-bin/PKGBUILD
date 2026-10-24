@@ -1,11 +1,9 @@
-# Maintainer: PLACEHOLDER <you@example.com>
+# Maintainer: ziyuw-Plank <236070466+ziyuw-Plank@users.noreply.github.com>
 #
 # Prebuilt DeepSeek Harness desktop (Electron + bundled dsh + primary-runtime).
 # Official upstream publishes macOS/Windows; this package installs a community
 # linux-x64 unsigned build that mirrors that layout (standalone Node Host).
 #
-# DO NOT submit to AUR until release URLs are real and the maintainer has
-# credentials. Placeholder source URL below.
 
 pkgname=deepseek-harness-desktop-bin
 _pkgver=0.2.1-rc.3
@@ -13,7 +11,7 @@ pkgver=0.2.1rc.3
 pkgrel=1
 pkgdesc='DeepSeek Harness desktop (prebuilt linux-x64 Electron + dsh runtime)'
 arch=('x86_64')
-url='https://github.com/deepseek-ai/deepseek-harness'
+url='https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux'
 license=('MIT')
 depends=(
   'alsa-lib' 'at-spi2-core' 'cairo' 'dbus' 'expat' 'glib2' 'gtk3' 'libcups'
@@ -29,9 +27,9 @@ provides=('deepseek-harness-desktop')
 conflicts=('deepseek-harness-desktop' 'dsh-tauri-desktop-bin')
 options=('!strip' '!debug')
 _deb="deepseek-harness-${_pkgver}-linux-amd64-unsigned.deb"
-# PLACEHOLDER: replace OWNER/REPO with the real GitHub Releases (or mirror) once published.
+
 source=(
-  "${_deb}::https://github.com/OWNER/REPO/releases/download/dsh-v${_pkgver}/${_deb}"
+  "${_deb}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64/${_deb}"
 )
 sha256sums=(
   'cca4948643a4d35e0f554b27958baaefe4c64e446475431e58ab55dd907748b8'
