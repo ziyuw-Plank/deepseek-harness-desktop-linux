@@ -1,0 +1,81 @@
+From 36ae2c53437a9ac0bafc2b37de7aa4e68cc489f6 Mon Sep 17 00:00:00 2001
+From: Grok Bot <builder@local>
+Date: Sat, 24 Oct 2026 13:15:27 +0800
+Subject: [PATCH 2/2] feat(desktop): Linux system tray and close-to-hide
+
+Enable DesktopTray on Linux using resources/icon.png, hide the main
+window on close when the tray is available (Host stays alive), and keep
+the process running on window-all-closed when a tray owns the session.
+Falls back to the previous quit-with-confirmation path if tray creation
+fails.
+
+Adapted from yaoyingkeji/linux-custom-titlebar tray behavior without
+taking titlebar/notification/auto-update extras.
+---
+ apps/desktop/src/main.ts | 17 +++++++++++------
+ apps/desktop/src/tray.ts |  4 ++--
+ 2 files changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 09d2d99d..3faf3da3 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -998,8 +998,11 @@ async function main(): Promise<void> {
+     tray?.relabel()
+   }
+   refreshApplicationMenu()
+-  const trayIconPath = development ? join(app.getAppPath(), 'resources', 'tray-windows.ico') : join(process.resourcesPath, 'tray.ico')
+-  if (process.platform === 'win32') {
++  // Linux system trays need a raster PNG; Windows uses its multi-size ICO.
++  const trayIconPath = process.platform === 'win32'
++    ? (development ? join(app.getAppPath(), 'resources', 'tray-windows.ico') : join(process.resourcesPath, 'tray.ico'))
++    : (development ? join(app.getAppPath(), 'resources', 'icon.png') : join(process.resourcesPath, 'icon.png'))
++  if (process.platform === 'win32' || process.platform === 'linux') {
+     // The tray is the way back to a hidden window; without it, relaunching the application still focuses it.
+     try {
+       tray = new DesktopTray({ iconPath: trayIconPath, locale: currentDesktopLocale,
+@@ -1090,9 +1093,9 @@ async function main(): Promise<void> {
+       if (quitting || shellInstallerOwnsQuit || sessionEnding) return
+       event.preventDefault()
+       if (updateDialog.isOpen) { updateDialog.focus(); return }
+-      // Linux has no tray or Dock icon to reach a hidden instance again, so closing the window quits;
+-      // cancelling a task confirmation restores the window instead of leaving it hidden.
+-      if (process.platform === 'linux') {
++      // Linux: hide to tray (Host keeps running) when a tray icon is available; otherwise quit
++      // after confirmation so the user is not left with an unreachable background process.
++      if (process.platform === 'linux' && tray === undefined) {
+         void quitConfirmation.confirm().then((approved) => {
+           if (quitting || shellInstallerOwnsQuit) return
+           if (approved) { finishQuit(); return }
+@@ -1265,7 +1268,9 @@ async function main(): Promise<void> {
+     if (!hasVisibleWindows) focusPrimaryWindow()
+   })
+   app.on('window-all-closed', () => {
+-    if (process.platform !== 'darwin') app.quit()
++    // macOS keeps the process for Dock reactivation; Linux with a tray does the same.
++    if (process.platform === 'darwin' || (process.platform === 'linux' && tray !== undefined)) return
++    app.quit()
+   })
+   if (process.platform !== 'win32') powerMonitor.on('shutdown', () => { sessionEnding = true })
+   const finishQuit = (): void => {
+diff --git a/apps/desktop/src/tray.ts b/apps/desktop/src/tray.ts
+index b2ce416b..e3d44095 100644
+--- a/apps/desktop/src/tray.ts
++++ b/apps/desktop/src/tray.ts
+@@ -1,11 +1,11 @@
+-/** Windows system tray: the always-present way back to a hidden window and the explicit quit entry. */
++/** System tray: the always-present way back to a hidden window and the explicit quit entry (Windows and Linux). */
+ 
+ import { Menu, nativeImage, Tray } from 'electron'
+ import type { DesktopLocale } from './locale.ts'
+ 
+ /** Main-process actions the tray triggers; both run the same paths as the window and application menu. */
+ export interface DesktopTrayOptions {
+-  /** Multi-size ICO rendered by `scripts/render-tray-icon.ts`; Windows picks the bitmap for the display scale. */
++  /** Multi-size ICO on Windows (from `scripts/render-tray-icon.ts`) or a PNG on Linux. */
+   readonly iconPath: string
+   readonly locale: () => DesktopLocale
+   /** Show and focus the primary window. */
+-- 
+2.47.3
+

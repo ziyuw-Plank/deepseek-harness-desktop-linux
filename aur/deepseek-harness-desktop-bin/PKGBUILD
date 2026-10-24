@@ -1,0 +1,53 @@
+# Maintainer: PLACEHOLDER <you@example.com>
+#
+# Prebuilt DeepSeek Harness desktop (Electron + bundled dsh + primary-runtime).
+# Official upstream publishes macOS/Windows; this package installs a community
+# linux-x64 unsigned build that mirrors that layout (standalone Node Host).
+#
+# DO NOT submit to AUR until release URLs are real and the maintainer has
+# credentials. Placeholder source URL below.
+
+pkgname=deepseek-harness-desktop-bin
+_pkgver=0.2.1-rc.3
+pkgver=0.2.1rc.3
+pkgrel=1
+pkgdesc='DeepSeek Harness desktop (prebuilt linux-x64 Electron + dsh runtime)'
+arch=('x86_64')
+url='https://github.com/deepseek-ai/deepseek-harness'
+license=('MIT')
+depends=(
+  'alsa-lib' 'at-spi2-core' 'cairo' 'dbus' 'expat' 'glib2' 'gtk3' 'libcups'
+  'libx11' 'libxcb' 'libxcomposite' 'libxdamage' 'libxext' 'libxfixes'
+  'libxkbcommon' 'libxrandr' 'mesa' 'nss' 'pango' 'systemd-libs' 'xdg-utils'
+)
+optdepends=(
+  'zenity: native directory dialogs for local directory selection'
+  'kdialog: native directory dialogs on Plasma'
+  'libnotify: desktop notifications (optional)'
+)
+provides=('deepseek-harness-desktop')
+conflicts=('deepseek-harness-desktop' 'dsh-tauri-desktop-bin')
+options=('!strip' '!debug')
+_deb="deepseek-harness-${_pkgver}-linux-amd64-unsigned.deb"
+# PLACEHOLDER: replace OWNER/REPO with the real GitHub Releases (or mirror) once published.
+source=(
+  "${_deb}::https://github.com/OWNER/REPO/releases/download/dsh-v${_pkgver}/${_deb}"
+)
+sha256sums=(
+  'cca4948643a4d35e0f554b27958baaefe4c64e446475431e58ab55dd907748b8'
+)
+
+package() {
+  bsdtar -xf data.tar.* -C "$pkgdir"
+
+  # electron-builder installs under /opt/DeepSeek Harness/ and ships
+  # /usr/share/applications + icons. Add a stable /usr/bin name if missing.
+  if [[ ! -e "$pkgdir/usr/bin/deepseek-harness-desktop" ]]; then
+    install -d "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/deepseek-harness-desktop" <<'WRAP'
+#!/bin/sh
+exec "/opt/DeepSeek Harness/deepseek-harness" "$@"
+WRAP
+    chmod 755 "$pkgdir/usr/bin/deepseek-harness-desktop"
+  fi
+}
