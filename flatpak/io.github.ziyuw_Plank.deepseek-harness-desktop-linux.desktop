@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=DSH Desktop (Community)
+GenericName=AI coding agent desktop
+Comment=Unofficial community Linux build of DeepSeek Harness desktop (not affiliated with DeepSeek)
+Exec=io.github.ziyuw_Plank.deepseek-harness-desktop-linux
+Icon=io.github.ziyuw_Plank.deepseek-harness-desktop-linux
+Terminal=false
+Categories=Development;IDE;
+Keywords=DSH;DeepSeek;Harness;AI;agent;
+StartupNotify=true

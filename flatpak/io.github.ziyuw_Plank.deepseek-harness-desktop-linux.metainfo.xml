@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DRAFT for local/self-host Flatpak experiments. Not Flathub-submission-ready.
+     Flathub manifests/metainfo must be human-authored (Generative AI policy). -->
+<component type="desktop-application">
+  <id>io.github.ziyuw_Plank.deepseek-harness-desktop-linux</id>
+  <name>DSH Desktop (Community)</name>
+  <summary>Unofficial community Linux desktop build based on DeepSeek Harness</summary>
+  <developer_name>ziyuw-Plank (community packager)</developer_name>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux</url>
+  <url type="bugtracker">https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/issues</url>
+  <url type="vcs-browser">https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux</url>
+  <description>
+    <p>
+      Community Linux packaging of the Electron desktop from the DeepSeek Harness
+      open-source project. This build is unsigned, unofficial, and not affiliated
+      with DeepSeek. Prefer adding an API key from platform.deepseek.com.
+    </p>
+    <p>
+      **Not an official DeepSeek product.** Name and icon are community marks (DSH)
+      to avoid trademark confusion with DeepSeek Harness.
+    </p>
+    <p>
+      **Credentials and plugins** live under ~/.dsh. The Flatpak sandbox may limit
+      Host/plugin access to host project trees compared with the AppImage/deb.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.ziyuw_Plank.deepseek-harness-desktop-linux.desktop</launchable>
+  <releases>
+    <release version="0.2.1-rc.3" date="2026-10-25">
+      <description>
+        <p>Based on upstream dsh-v0.2.1-rc.3 with community Linux packaging patches (API-key UX, Wayland drag, SIGINT exit, /opt layout).</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Development</category>
+    <category>IDE</category>
+  </categories>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+</component>

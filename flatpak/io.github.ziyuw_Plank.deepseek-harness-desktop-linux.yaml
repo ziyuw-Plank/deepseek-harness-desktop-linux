@@ -1,0 +1,71 @@
+# DRAFT — local / self-hosted Flatpak experiment ONLY.
+# DO NOT copy unchanged into flathub/flathub.
+# Flathub policy: manifests must not contain AI-generated content;
+# agents must not open Flathub submission PRs.
+# See NOTICE.md, FLATHUB-ASSESSMENT.md, HUMAN-SUBMISSION-STEPS.md.
+#
+# Strategy: extra-data unsigned .deb + Electron BaseApp (practical local packaging).
+# Flathub preferred path is full from-source; third-party IDE/agent desktops
+# are often rejected regardless (see assessment).
+
+id: io.github.ziyuw_Plank.deepseek-harness-desktop-linux
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '25.08'
+command: io.github.ziyuw_Plank.deepseek-harness-desktop-linux
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=x11
+  - --device=dri
+  - --filesystem=home
+  - --env=ELECTRON_TRASH=gio
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+modules:
+  - name: deepseek-harness-desktop
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 scripts/run.sh /app/bin/io.github.ziyuw_Plank.deepseek-harness-desktop-linux
+      - install -Dm755 scripts/apply_extra.sh /app/bin/apply_extra
+      - install -Dm644 io.github.ziyuw_Plank.deepseek-harness-desktop-linux.desktop -t /app/share/applications
+      - install -Dm644 io.github.ziyuw_Plank.deepseek-harness-desktop-linux.metainfo.xml -t /app/share/metainfo
+      - install -Dm644 icons/io.github.ziyuw_Plank.deepseek-harness-desktop-linux.svg -t /app/share/icons/hicolor/scalable/apps
+      # apply_extra needs GNU ar (same pattern as com.visualstudio.code)
+      - install -Dm755 /usr/bin/ar /app/bin/ar
+      - |
+        set -e
+        mkdir -p /app/lib
+        ARCH_TRIPLE=$(gcc --print-multiarch)
+        cp -a /usr/lib/${ARCH_TRIPLE}/libbfd-*.so /app/lib/ 2>/dev/null || cp -a /usr/lib/${ARCH_TRIPLE}/libbfd.so* /app/lib/
+        cp -a /usr/lib/${ARCH_TRIPLE}/libsframe.so* /app/lib/ 2>/dev/null || true
+    sources:
+      - type: file
+        path: scripts/run.sh
+        dest: scripts
+      - type: file
+        path: scripts/apply_extra.sh
+        dest: scripts
+      - type: file
+        path: io.github.ziyuw_Plank.deepseek-harness-desktop-linux.desktop
+      - type: file
+        path: io.github.ziyuw_Plank.deepseek-harness-desktop-linux.metainfo.xml
+      - type: file
+        path: icons/io.github.ziyuw_Plank.deepseek-harness-desktop-linux.svg
+        dest: icons
+      - type: extra-data
+        filename: deepseek-harness.deb
+        only-arches: [x86_64]
+        url: https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64.2/deepseek-harness-0.2.1-rc.3-linux-amd64-unsigned.deb
+        sha256: 976053d1c9da0e5eecce46023299a409461327bd1e8f1f46921fe0124d81831c
+        size: 288096020
+        x-checker-data:
+          type: json
+          url: https://api.github.com/repos/ziyuw-Plank/deepseek-harness-desktop-linux/releases/latest
+          version-query: .tag_name
+          url-query: .assets[] | select(.name|test("amd64-unsigned.deb$")) | .browser_download_url
+          size-query: .assets[] | select(.name|test("amd64-unsigned.deb$")) | .size

@@ -80,3 +80,13 @@ cp -n apps/desktop/.env.linux.example apps/desktop/.env.linux
 pnpm install --frozen-lockfile
 pnpm --filter @deepseek-ai/dsh-desktop run package:linux:x64:unsigned
 ```
+
+
+## Flatpak / Flathub (2026-10-25)
+
+- Draft tree: `flatpak/` (app-id `io.github.ziyuw_Plank.deepseek-harness-desktop-linux`, display **DSH Desktop (Community)**)
+- Strategy for local packaging: Electron BaseApp + `extra-data` AppImage from Release `.2`
+- **Flathub PR: not opened** (policy: agents must not open Flathub PRs; manifests must not be AI-generated). See `flatpak/NOTICE.md` + `HUMAN-SUBMISSION-STEPS.md`
+- **Acceptance risk: high reject** — third-party broad-scope agent/IDE desktop (Cursor flathub#6566 precedent), RC not stable, from-source impractical for ~1.1GB primary-runtime, trademark/naming constraints (use DSH not DeepSeek Harness)
+- Recommended: keep GitHub Releases; optional self-hosted Flatpak; wait for upstream stable + official Flatpak for Flathub
+- Local build (box, 2026-10-25 Asia/Manila): `flatpak-builder` **succeeded** with Electron2.BaseApp 25.08 + extra-data `.deb`; system install from local OSTree repo **succeeded** (payload under `/app/extra/deepseek-harness`). User-session BaseApp install failed on this headless box (parental-controls/DBus socket). GUI smoke not run here.

@@ -39,6 +39,8 @@ sudo apt install ./deepseek-harness-*-linux-amd64-unsigned.deb
 
 - `patches/` — commits on top of official tag `dsh-v0.2.1-rc.3` (linux-x64 packaging, tray/close-to-hide, Linux window drag, terminal SIGINT/SIGTERM clean exit, API-key UX + `/opt/deepseek-harness` + Win Platform i18n)
 - `aur/deepseek-harness-desktop-bin/` — draft AUR `-bin` package (not submitted yet)
+- `aur/deepseek-harness-desktop-portable/` — AppImage AUR draft (blocked on AUR registration)
+- `flatpak/` — local/self-host Flatpak **draft** + Flathub risk notes (**no Flathub PR opened**; see `flatpak/FLATHUB-ASSESSMENT.md`)
 - `docs/STATUS.md` — build/smoke notes from the packager machine
 
 ## Rebuild from source
