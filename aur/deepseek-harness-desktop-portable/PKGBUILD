@@ -1,0 +1,87 @@
+# Maintainer: ziyuw-Plank <236070466+ziyuw-Plank@users.noreply.github.com>
+#
+# Community prebuilt AppImage of DeepSeek Harness desktop for Linux x64.
+# Official upstream publishes macOS/Windows; this package installs an unsigned
+# portable AppImage that mirrors that layout (standalone Node Host).
+#
+# Install prefix: /opt/deepseek-harness (same as the community .deb).
+# Credentials / third-party plugins live under ~/.dsh (not under /opt).
+
+pkgname=deepseek-harness-desktop-portable
+_pkgver=0.2.1-rc.3
+_reltag=v0.2.1-rc.3-linux-x64.2
+pkgver=0.2.1rc3
+pkgrel=1
+pkgdesc='DeepSeek Harness desktop — portable AppImage (community linux-x64 unsigned)'
+arch=('x86_64')
+url='https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux'
+license=('MIT')
+depends=(
+  'alsa-lib' 'at-spi2-core' 'cairo' 'dbus' 'expat' 'fuse2' 'glib2' 'gtk3'
+  'hicolor-icon-theme' 'libcups' 'libx11' 'libxcb' 'libxcomposite' 'libxdamage'
+  'libxext' 'libxfixes' 'libxkbcommon' 'libxrandr' 'mesa' 'nss' 'pango'
+  'systemd-libs' 'xdg-utils' 'zlib'
+)
+optdepends=(
+  'zenity: native directory dialogs for local directory selection'
+  'kdialog: native directory dialogs on Plasma'
+  'libnotify: desktop notifications (optional)'
+)
+provides=('deepseek-harness-desktop')
+conflicts=(
+  'deepseek-harness-desktop'
+  'deepseek-harness-desktop-bin'
+  'dsh-tauri-desktop-bin'
+)
+options=('!strip' '!debug')
+_appimage="deepseek-harness-${_pkgver}-linux-x86_64-unsigned.AppImage"
+source=(
+  "${_appimage}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/${_reltag}/${_appimage}"
+)
+sha256sums=(
+  '080ff624833d41728c141cecc7b32f19090420bf4b0755ecfc1fbbb0c216cfb7'
+)
+noextract=("${_appimage}")
+
+prepare() {
+  chmod +x "${_appimage}"
+  ./"${_appimage}" --appimage-extract
+}
+
+build() {
+  # Point .desktop at the installed wrapper; suppress AppImage desktop-integration popup
+  sed -i -E \
+    -e 's|^Exec=.*|Exec=env DESKTOPINTEGRATION=false /usr/bin/deepseek-harness-desktop --no-sandbox %U|' \
+    squashfs-root/deepseek-harness.desktop
+  # Fix AppImage extract perms (often 700)
+  chmod -R a-x+rX squashfs-root/usr 2>/dev/null || true
+}
+
+package() {
+  # AppImage under /opt/deepseek-harness (matches community .deb layout)
+  install -Dm755 "${srcdir}/${_appimage}" \
+    "${pkgdir}/opt/deepseek-harness/deepseek-harness.AppImage"
+
+  # Stable launcher with no-FUSE fallback
+  install -d "${pkgdir}/usr/bin"
+  cat > "${pkgdir}/usr/bin/deepseek-harness-desktop" <<'WRAP'
+#!/bin/sh
+APPIMAGE="/opt/deepseek-harness/deepseek-harness.AppImage"
+if [ -e /dev/fuse ] || [ -e /dev/fuse0 ]; then
+  exec "$APPIMAGE" "$@"
+fi
+exec env APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" "$@"
+WRAP
+  chmod 755 "${pkgdir}/usr/bin/deepseek-harness-desktop"
+
+  install -Dm644 "${srcdir}/squashfs-root/deepseek-harness.desktop" \
+    "${pkgdir}/usr/share/applications/deepseek-harness.desktop"
+
+  if [[ -d "${srcdir}/squashfs-root/usr/share/icons" ]]; then
+    install -d "${pkgdir}/usr/share"
+    cp -a "${srcdir}/squashfs-root/usr/share/icons" "${pkgdir}/usr/share/"
+  fi
+
+  install -Dm644 "${srcdir}/squashfs-root/LICENSE.electron.txt" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE.electron.txt"
+}

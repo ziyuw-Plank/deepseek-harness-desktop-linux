@@ -33,9 +33,12 @@
 - Credentials remain in `~/.dsh/.credentials.yaml`; third-party plugins install under writable `~/.dsh/profiles/desktop` (Host tree under `resources/dsh` is read-only in packages).
 
 
-### AUR draft
+### AUR
 
-`aur/deepseek-harness-desktop-bin/` — `/opt/deepseek-harness`, pkgrel bump for .2. **Do not submit** to AUR yet.
+- **Target package:** `deepseek-harness-desktop-portable` (AppImage → `/opt/deepseek-harness/deepseek-harness.AppImage`)
+- Draft files: `aur/deepseek-harness-desktop-portable/{PKGBUILD,.SRCINFO}` (also in publish-repo)
+- Older deb draft kept at `aur/deepseek-harness-desktop-bin/` (not submitted)
+- **AUR push blocked:** no SSH key registered with aur.archlinux.org on user machine or box (all tried keys: Permission denied publickey). Need AUR account + upload SSH pubkey at https://aur.archlinux.org/account/ then `git push ssh://aur@aur.archlinux.org/deepseek-harness-desktop-portable.git`
 
 ## Prior: v0.2.1-rc.3-linux-x64.1
 
