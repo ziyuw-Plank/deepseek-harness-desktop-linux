@@ -8,7 +8,7 @@
 pkgname=deepseek-harness-desktop-bin
 _pkgver=0.2.1-rc.3
 pkgver=0.2.1rc.3
-pkgrel=2
+pkgrel=3
 pkgdesc='DeepSeek Harness desktop (prebuilt linux-x64 Electron + dsh runtime)'
 arch=('x86_64')
 url='https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux'
@@ -29,22 +29,22 @@ options=('!strip' '!debug')
 _deb="deepseek-harness-${_pkgver}-linux-amd64-unsigned.deb"
 
 source=(
-  "${_deb}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64.1/${_deb}"
+  "${_deb}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64.2/${_deb}"
 )
 sha256sums=(
-  '816bdc6ac2cf6c789db3f88c83362973b6bdfe9fb8b4dee6ffc56f3f6b3c724f'
+  '976053d1c9da0e5eecce46023299a409461327bd1e8f1f46921fe0124d81831c'
 )
 
 package() {
   bsdtar -xf data.tar.* -C "$pkgdir"
 
-  # electron-builder installs under /opt/DeepSeek Harness/ and ships
+  # electron-builder installs under /opt/deepseek-harness/ and ships
   # /usr/share/applications + icons. Add a stable /usr/bin name if missing.
   if [[ ! -e "$pkgdir/usr/bin/deepseek-harness-desktop" ]]; then
     install -d "$pkgdir/usr/bin"
     cat > "$pkgdir/usr/bin/deepseek-harness-desktop" <<'WRAP'
 #!/bin/sh
-exec "/opt/DeepSeek Harness/deepseek-harness" "$@"
+exec "/opt/deepseek-harness/deepseek-harness" "$@"
 WRAP
     chmod 755 "$pkgdir/usr/bin/deepseek-harness-desktop"
   fi

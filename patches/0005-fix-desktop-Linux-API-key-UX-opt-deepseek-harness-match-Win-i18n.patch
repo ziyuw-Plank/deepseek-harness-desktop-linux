@@ -1,0 +1,247 @@
+From 26990198521905b1b20c9d7cb3829ff50e4c657f Mon Sep 17 00:00:00 2001
+From: ziyuw-Plank <236070466+ziyuw-Plank@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 18:16:20 +0800
+Subject: [PATCH] fix(desktop): Linux API-key UX, /opt/deepseek-harness, match
+ Win Platform i18n
+
+- Treat enterWorkspace failure after a successful credential save as non-fatal
+  so welcome no longer shows "could not save" when the key is already on disk.
+- On Linux, prefer official addApiKey / welcomeApiKey CTAs (same i18n keys and
+  zh/en strings Windows uses) for bottom-left menu and welcome entry.
+- Map Linux desktopPlatform to win32 so Host Platform headers match Windows
+  (schema has no linux value; null previously fell back to web).
+- Set Linux productName to deepseek-harness so FpmTarget installs under
+  /opt/deepseek-harness while desktop Name stays "DeepSeek Harness".
+---
+ apps/desktop/electron-builder.config.d.mts    |  3 +++
+ .../scripts/electron-builder-config.mjs       |  8 +++++++-
+ apps/desktop/src/client/WelcomePage.tsx       | 10 ++++++++--
+ apps/desktop/src/main.ts                      |  3 ++-
+ apps/desktop/src/preload-welcome.ts           |  2 ++
+ apps/desktop/tests/linux-packaging.spec.ts    | 11 ++++++++++-
+ .../tests/welcome-renderer.client.spec.tsx    | 15 +++++++++++++++
+ packages/bundle/base/cordis.patch.yml         |  3 ++-
+ .../src/client/AccountMenu.tsx                |  6 +++++-
+ .../tests/account.client.spec.tsx             | 19 +++++++++++++++++++
+ 10 files changed, 73 insertions(+), 7 deletions(-)
+
+diff --git a/apps/desktop/electron-builder.config.d.mts b/apps/desktop/electron-builder.config.d.mts
+index 434de600..7b46e82e 100644
+--- a/apps/desktop/electron-builder.config.d.mts
++++ b/apps/desktop/electron-builder.config.d.mts
+@@ -3,6 +3,8 @@ import type { AfterPackContext, BeforePackContext } from 'app-builder-lib'
+ /** Electron-builder fields asserted by the Desktop release tests. */
+ export interface DesktopElectronBuilderConfig {
+   readonly appId: string
++  /** Linux uses deepseek-harness so /opt has no spaces; macOS/Windows keep DeepSeek Harness. */
++  readonly productName: 'DeepSeek Harness' | 'deepseek-harness'
+   readonly artifactName: string
+   readonly protocols: readonly [{ readonly name: 'DeepSeek Harness'; readonly schemes: readonly ['dsh'] }]
+   readonly directories: {
+@@ -48,6 +50,7 @@ export interface DesktopElectronBuilderConfig {
+     readonly category: 'Development'
+     readonly executableName: 'deepseek-harness'
+     readonly syncDesktopName: true
++    readonly desktop: { readonly entry: { readonly Name: 'DeepSeek Harness' } }
+     readonly target: readonly ['AppImage', 'deb']
+   }
+   readonly deb: {
+diff --git a/apps/desktop/scripts/electron-builder-config.mjs b/apps/desktop/scripts/electron-builder-config.mjs
+index 90480912..d065c1aa 100644
+--- a/apps/desktop/scripts/electron-builder-config.mjs
++++ b/apps/desktop/scripts/electron-builder-config.mjs
+@@ -114,7 +114,9 @@ export function createElectronBuilderConfig(
+       ...buildVersion === productVersion ? {} : { version: buildVersion },
+       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
+     },
+-    productName: 'DeepSeek Harness',
++    // Linux FpmTarget installs under /opt/${sanitizedProductName}; keep the Unix prefix
++    // space-free. Display Name stays "DeepSeek Harness" via linux.desktop.entry below.
++    productName: resolvedPlatform === 'linux' ? 'deepseek-harness' : 'DeepSeek Harness',
+     // Unsigned builds carry their own suffix so a shared file can never pass for a release artifact.
+     artifactName: `deepseek-harness-\${version}-\${os}-\${arch}${output.suffix}.\${ext}`,
+     directories: { output: output.directory },
+@@ -270,6 +272,10 @@ export function createElectronBuilderConfig(
+       // Matches the desktop file to package.json desktopName, which Electron reports
+       // as the Wayland app_id / WM_CLASS so docks group the running window with this entry.
+       syncDesktopName: true,
++      // Keep the human-facing Name while productName drives /opt/deepseek-harness.
++      desktop: {
++        entry: { Name: 'DeepSeek Harness' },
++      },
+       target: ['AppImage', 'deb'],
+     },
+     deb: {
+diff --git a/apps/desktop/src/client/WelcomePage.tsx b/apps/desktop/src/client/WelcomePage.tsx
+index b3670617..f0008597 100644
+--- a/apps/desktop/src/client/WelcomePage.tsx
++++ b/apps/desktop/src/client/WelcomePage.tsx
+@@ -209,8 +209,14 @@ export function Welcome({ api }: { api: WelcomeApi }) {
+           onClick={() => { void cancel() }}>{m.welcomeAuthCancel}</button>
+       </div>
+       <div id="entry-actions" className="actions" hidden={page !== 'entry'}>
+-        <button id="sign-in" className="primary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'sign_in' }); void start() }}>{m.welcomeSignIn}</button>
+-        <button ref={keyButton} id="api-key" className="secondary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
++        {/* Linux prefers Add API Key (official welcomeApiKey / welcomeSignIn copy — same strings as Windows). */}
++        {typeof document !== 'undefined' && document.documentElement.dataset.platform === 'linux' ? <>
++          <button ref={keyButton} id="api-key" className="primary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
++          <button id="sign-in" className="secondary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'sign_in' }); void start() }}>{m.welcomeSignIn}</button>
++        </> : <>
++          <button id="sign-in" className="primary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'sign_in' }); void start() }}>{m.welcomeSignIn}</button>
++          <button ref={keyButton} id="api-key" className="secondary" type="button" onClick={() => { void api.analytics?.('auth_page_click', { button_name: 'api-key' }); navigate('key') }}>{m.welcomeApiKey}</button>
++        </>}
+       </div>
+       <div id="key-actions" className="actions" hidden={page !== 'key'}>
+         <button id="save-key" className="primary" type="submit" form="key-form" disabled={busy || draft.trim() === ''}>{m.welcomeKeySave}</button>
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 3316c830..71920284 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -1211,7 +1211,8 @@ async function main(): Promise<void> {
+           if (backend.host === undefined || welcomeBackend === undefined) return { ok: false }
+           const saved = await welcomeBackend.save(apiKey)
+           if (!saved.ok) return saved
+-          await enterWorkspace()
++          // Credential write already succeeded; do not report workspace entry failure as a save failure.
++          try { await enterWorkspace() } catch { /* welcome stays open; key is on disk */ }
+           return { ok: true }
+         },
+         skip: enterWorkspace,
+diff --git a/apps/desktop/src/preload-welcome.ts b/apps/desktop/src/preload-welcome.ts
+index 6748367e..e35f61b4 100644
+--- a/apps/desktop/src/preload-welcome.ts
++++ b/apps/desktop/src/preload-welcome.ts
+@@ -4,6 +4,7 @@ import type { AccountView, SignInAttemptId } from '@deepseek-ai/dsh-deepseek-acc
+ import { contextBridge, ipcRenderer } from 'electron'
+ import { resolveDesktopLocale } from './locale.ts'
+ import { WELCOME_IPC, type WelcomeApi, type WelcomeNotice, type WelcomeSaveResult } from './welcome-api.ts'
++import { markDocumentPlatform } from './preload-platform.ts'
+ 
+ const prefix = '--dsh-welcome-locale='
+ const locale = process.argv.find(argument => argument.startsWith(prefix))?.slice(prefix.length)
+@@ -26,4 +27,5 @@ const api: WelcomeApi = {
+   saveApiKey: (value: string) => ipcRenderer.invoke(WELCOME_IPC.saveApiKey, value) as Promise<WelcomeSaveResult>,
+   skip: () => ipcRenderer.invoke(WELCOME_IPC.skip) as Promise<void>,
+ }
++markDocumentPlatform()
+ contextBridge.exposeInMainWorld('dshWelcome', api)
+diff --git a/apps/desktop/tests/linux-packaging.spec.ts b/apps/desktop/tests/linux-packaging.spec.ts
+index 6017de15..d15dab28 100644
+--- a/apps/desktop/tests/linux-packaging.spec.ts
++++ b/apps/desktop/tests/linux-packaging.spec.ts
+@@ -15,8 +15,17 @@ describe('unsigned Linux packaging configuration', () => {
+     const config = createElectronBuilderConfig(UNSIGNED_LINUX, 'linux', 'x64')
+     expect(config.publish).toBeNull()
+     expect(config.extraMetadata).not.toHaveProperty('dshMandatoryUpdatePolicy')
+-    expect(config.linux).toMatchObject({ executableName: 'deepseek-harness', syncDesktopName: true, target: ['AppImage', 'deb'] })
++    expect(config.productName).toBe('deepseek-harness')
++    expect(config.linux).toMatchObject({
++      executableName: 'deepseek-harness',
++      syncDesktopName: true,
++      target: ['AppImage', 'deb'],
++      desktop: { entry: { Name: 'DeepSeek Harness' } },
++    })
+     expect(existsSync(config.linux.icon)).toBe(true)
++    // macOS / Windows keep the display product name.
++    expect(createElectronBuilderConfig({ DSH_DESKTOP_APP_ID: 'com.example.mac', DSH_DESKTOP_UNSIGNED: '1' }, 'darwin', 'arm64').productName)
++      .toBe('DeepSeek Harness')
+     expect(() => {
+       validateDesktopPackageEnvironment(UNSIGNED_LINUX, { platform: 'linux', arch: 'x64' }, { unsigned: true })
+     }).not.toThrow()
+diff --git a/apps/desktop/tests/welcome-renderer.client.spec.tsx b/apps/desktop/tests/welcome-renderer.client.spec.tsx
+index 575c7423..b3bc8bc5 100644
+--- a/apps/desktop/tests/welcome-renderer.client.spec.tsx
++++ b/apps/desktop/tests/welcome-renderer.client.spec.tsx
+@@ -48,6 +48,21 @@ function mount(language = 'zh-CN', takeNotice = vi.fn<() => Promise<WelcomeNotic
+ }
+ 
+ describe('desktop welcome presentation', () => {
++  it('prefers Add API Key as the primary entry action on Linux (official welcomeApiKey copy)', () => {
++    document.documentElement.dataset.platform = 'linux'
++    try {
++      const view = mount('en')
++      const apiKey = view.button('#api-key')
++      const signIn = view.button('#sign-in')
++      expect(apiKey.className).toContain('primary')
++      expect(signIn.className).toContain('secondary')
++      expect(apiKey.textContent).toBe(view.api.messages.welcomeApiKey)
++      expect(signIn.textContent).toBe(view.api.messages.welcomeSignIn)
++    } finally {
++      delete document.documentElement.dataset.platform
++    }
++  })
++
+   it.each(['zh-CN', 'en'])('renders the %s entry and API-key step', async (language) => {
+     const view = mount(language)
+     expect(view.document.documentElement.lang).toBe(language)
+diff --git a/packages/bundle/base/cordis.patch.yml b/packages/bundle/base/cordis.patch.yml
+index 7d63cf26..6c1ac1e7 100644
+--- a/packages/bundle/base/cordis.patch.yml
++++ b/packages/bundle/base/cordis.patch.yml
+@@ -120,7 +120,8 @@
+     - id: deepseek-account
+       name: '@deepseek-ai/dsh-deepseek-account-platform'
+       config:
+-        desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' && ['darwin', 'win32'].includes(process.platform) ? process.platform : null"
++        # Linux Desktop has no Platform enum value; use win32 so Host/Platform headers and i18n match Windows.
++        desktopPlatform: !!js "ctx.get('profileContext')?.name === 'desktop' ? (process.platform === 'darwin' ? 'darwin' : (process.platform === 'win32' || process.platform === 'linux' ? 'win32' : null)) : null"
+ 
+     - id: credentials
+       name: '@deepseek-ai/dsh-credentials-local'
+diff --git a/packages/client/ui-settings-account/src/client/AccountMenu.tsx b/packages/client/ui-settings-account/src/client/AccountMenu.tsx
+index f2274e30..885bd6b7 100644
+--- a/packages/client/ui-settings-account/src/client/AccountMenu.tsx
++++ b/packages/client/ui-settings-account/src/client/AccountMenu.tsx
+@@ -75,14 +75,18 @@ export function AccountMenu({
+         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
+           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
+         { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
++        // Linux bottom-left prefers official addApiKey copy (same i18n key Windows uses in SignInDialog).
+         ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
+-          : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
++          : typeof document !== 'undefined' && document.documentElement.dataset.platform === 'linux'
++            ? [{ id: 'add-api-key', label: t('addApiKey'), icon: <IconUserOutlineMedium size={16} /> }]
++            : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
+       ]}
+       onClose={() => { setOpen(false) }}
+       onSelect={(id) => {
+         if (id === 'settings') { setOpen(false); trigger.current?.focus(); openSettings() }
+         else if (id === 'contact') { setOpen(false); contactUs() }
+         else if (id === 'signin') beginSignIn()
++        else if (id === 'add-api-key') { setOpen(false); openOnboarding('deepseek-official') }
+         else void requestSignOut()
+       }} />
+     {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
+diff --git a/packages/client/ui-settings-account/tests/account.client.spec.tsx b/packages/client/ui-settings-account/tests/account.client.spec.tsx
+index e6c72c09..8ea2ab0a 100644
+--- a/packages/client/ui-settings-account/tests/account.client.spec.tsx
++++ b/packages/client/ui-settings-account/tests/account.client.spec.tsx
+@@ -201,6 +201,25 @@ it.each([en, zh])('offers settings, contact and sign-in from the signed-out acco
+   expect(operations.contactUs).toHaveBeenCalledOnce()
+ })
+ 
++it('offers Add API Key from the signed-out account menu on Linux (official addApiKey copy)', async () => {
++  document.documentElement.dataset.platform = 'linux'
++  try {
++    const openOnboarding = vi.fn()
++    const operations = operationsOf({ status: 'signed-out', attempt: null })
++    const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
++    render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
++      useAccount={selector => selector(operations.hooks.account.getSnapshot())}
++      useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={openOnboarding} openSettings={() => {}}
++      t={key => key in en ? en[key as AccountKey] : key} />)
++    fireEvent.click(screen.getByRole('button', { name: en.menu }))
++    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([en.settings, en.contactUs, en.addApiKey])
++    fireEvent.click(screen.getByRole('menuitem', { name: en.addApiKey }))
++    expect(openOnboarding).toHaveBeenCalledExactlyOnceWith('deepseek-official')
++  } finally {
++    delete document.documentElement.dataset.platform
++  }
++})
++
+ it('reports a failed start in the login dialog, not as a sidebar alert', async () => {
+   const operations = mount({ status: 'signed-out', attempt: null })
+   cleanup()
+-- 
+2.47.3
+

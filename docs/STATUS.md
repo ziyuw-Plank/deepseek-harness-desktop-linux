@@ -1,12 +1,45 @@
 # DeepSeek Harness Linux x64 desktop — status
 
-**Latest: SUCCESS** — Release **`v0.2.1-rc.3-linux-x64.1`** (2026-10-25 Asia/Manila UTC+8)
+**Latest: SUCCESS** — Release **`v0.2.1-rc.3-linux-x64.2`** (2026-10-25 Asia/Manila UTC+8)
 
 - **Base tag:** `dsh-v0.2.1-rc.3` (`1f81c047`)
-- **Branch tip:** `linux-x64-desktop` @ `7dd70618`
+- **Branch tip:** `linux-x64-desktop` @ `26990198`
 - **Repo:** https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux
 
-## v0.2.1-rc.3-linux-x64.1 (this rebuild)
+## v0.2.1-rc.3-linux-x64.2 (this rebuild)
+
+| Fix | Commit / patch | Notes |
+| --- | --- | --- |
+| Welcome API-key save vs workspace entry | `26990198` / `0005-…` | After credentials write succeeds, `enterWorkspace` errors no longer surface as “could not save” |
+| Linux prefers Add API Key CTAs | same | Bottom-left + welcome use official `addApiKey` / `welcomeApiKey` i18n (same en/zh as Windows); no invented Linux-only strings |
+| Platform headers match Windows | same | `desktopPlatform` → `win32` on Linux (schema has no `linux`; was `null` → web) |
+| Install prefix `/opt/deepseek-harness` | same | Linux `productName` = `deepseek-harness`; desktop Name remains “DeepSeek Harness”. Credentials/plugins stay under `~/.dsh` |
+| Plugins | docs | Host tree under `resources/dsh` (read-only in packages); third-party installs via cordis/pnpm into writable `~/.dsh/profiles/desktop` |
+
+### sha256sums
+
+```
+976053d1c9da0e5eecce46023299a409461327bd1e8f1f46921fe0124d81831c  deepseek-harness-0.2.1-rc.3-linux-amd64-unsigned.deb
+080ff624833d41728c141cecc7b32f19090420bf4b0755ecfc1fbbb0c216cfb7  deepseek-harness-0.2.1-rc.3-linux-x86_64-unsigned.AppImage
+```
+
+### Verification
+
+- Deb installs under `/opt/deepseek-harness/` (no spaces); `.desktop` Name=`DeepSeek Harness`, Exec=`/opt/deepseek-harness/deepseek-harness`.
+- Packed `app.asar` `lib/main.js`: `saveApiKey` try/catch around `enterWorkspace` after successful credential write.
+- Welcome renderer: Linux entry prefers official `welcomeApiKey` as primary.
+- `dsh-client-ui-settings-account`: signed-out Linux menu uses official `addApiKey` → `openOnboarding('deepseek-official')`.
+- `dsh-base/cordis.patch.yml`: `desktopPlatform` → `win32` on Linux (match Windows Platform headers / i18n path).
+- Credentials remain in `~/.dsh/.credentials.yaml`; third-party plugins install under writable `~/.dsh/profiles/desktop` (Host tree under `resources/dsh` is read-only in packages).
+
+
+### AUR draft
+
+`aur/deepseek-harness-desktop-bin/` — `/opt/deepseek-harness`, pkgrel bump for .2. **Do not submit** to AUR yet.
+
+## Prior: v0.2.1-rc.3-linux-x64.1
+
+## v0.2.1-rc.3-linux-x64.1
 
 | Fix | Commit / patch | Notes |
 | --- | --- | --- |

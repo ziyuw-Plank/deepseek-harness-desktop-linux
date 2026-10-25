@@ -13,7 +13,7 @@ Download the latest **Release** assets (do not use GitHub’s auto “Source cod
 | `*-linux-amd64-unsigned.deb` | Debian/Ubuntu/Arch (`dpkg` / `debtap` / extract) |
 | `*-linux-x86_64-unsigned.AppImage` | Portable; `chmod +x` then run. No FUSE? `./….AppImage --appimage-extract-and-run` |
 
-Current target: **`dsh-v0.2.1-rc.3`**. Latest packaging Release: **[`v0.2.1-rc.3-linux-x64.1`](https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/tag/v0.2.1-rc.3-linux-x64.1)** (drag + Ctrl+C fixes).
+Current target: **`dsh-v0.2.1-rc.3`**. Latest packaging Release: **[`v0.2.1-rc.3-linux-x64.2`](https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/tag/v0.2.1-rc.3-linux-x64.2)** (API-key UX, `/opt/deepseek-harness`, Win-matched Platform i18n).
 
 Download size is ~275 MB (deb) / ~344 MB (AppImage). Installed footprint is ~1.1 GB (Electron + bundled dsh + primary-runtime Node) — same shape as official Win/mac.
 
@@ -32,9 +32,12 @@ chmod +x deepseek-harness-*-linux-x86_64-unsigned.AppImage
 sudo apt install ./deepseek-harness-*-linux-amd64-unsigned.deb
 ```
 
+> **Upgrade from .1:** install path moved from `/opt/DeepSeek Harness` to `/opt/deepseek-harness`. Remove the old package first if the deb upgrade leaves both trees. User data stays in `~/.dsh` (credentials + plugins).
+
+
 ## What’s in this repo
 
-- `patches/` — commits on top of official tag `dsh-v0.2.1-rc.3` (linux-x64 packaging, tray/close-to-hide, Linux window drag, terminal SIGINT/SIGTERM clean exit)
+- `patches/` — commits on top of official tag `dsh-v0.2.1-rc.3` (linux-x64 packaging, tray/close-to-hide, Linux window drag, terminal SIGINT/SIGTERM clean exit, API-key UX + `/opt/deepseek-harness` + Win Platform i18n)
 - `aur/deepseek-harness-desktop-bin/` — draft AUR `-bin` package (not submitted yet)
 - `docs/STATUS.md` — build/smoke notes from the packager machine
 
