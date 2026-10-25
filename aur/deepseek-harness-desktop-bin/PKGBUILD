@@ -8,7 +8,7 @@
 pkgname=deepseek-harness-desktop-bin
 _pkgver=0.2.1-rc.3
 pkgver=0.2.1rc.3
-pkgrel=1
+pkgrel=2
 pkgdesc='DeepSeek Harness desktop (prebuilt linux-x64 Electron + dsh runtime)'
 arch=('x86_64')
 url='https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux'
@@ -29,10 +29,10 @@ options=('!strip' '!debug')
 _deb="deepseek-harness-${_pkgver}-linux-amd64-unsigned.deb"
 
 source=(
-  "${_deb}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64/${_deb}"
+  "${_deb}::https://github.com/ziyuw-Plank/deepseek-harness-desktop-linux/releases/download/v0.2.1-rc.3-linux-x64.1/${_deb}"
 )
 sha256sums=(
-  'cca4948643a4d35e0f554b27958baaefe4c64e446475431e58ab55dd907748b8'
+  '816bdc6ac2cf6c789db3f88c83362973b6bdfe9fb8b4dee6ffc56f3f6b3c724f'
 )
 
 package() {

@@ -1,2 +1,2 @@
-cca4948643a4d35e0f554b27958baaefe4c64e446475431e58ab55dd907748b8  deepseek-harness-0.2.1-rc.3-linux-amd64-unsigned.deb
-dba9e4342dd44875c6508306a73e563ec5975055f5d1fb45d3d42b22ac6a23e2  deepseek-harness-0.2.1-rc.3-linux-x86_64-unsigned.AppImage
+816bdc6ac2cf6c789db3f88c83362973b6bdfe9fb8b4dee6ffc56f3f6b3c724f  deepseek-harness-0.2.1-rc.3-linux-amd64-unsigned.deb
+fb84616c1693b7cab26a2cba10214c5f9f232b0bd4e2457afe734a238f555b08  deepseek-harness-0.2.1-rc.3-linux-x86_64-unsigned.AppImage

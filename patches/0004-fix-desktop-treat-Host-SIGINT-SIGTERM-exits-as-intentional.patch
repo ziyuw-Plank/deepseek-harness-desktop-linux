@@ -1,0 +1,98 @@
+From 7dd706188055c00c6e332c50ab10aa31f6a795e5 Mon Sep 17 00:00:00 2001
+From: ziyuw-Plank <236070466+ziyuw-Plank@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 17:46:37 +0800
+Subject: [PATCH 2/2] fix(desktop): treat Host SIGINT/SIGTERM exits as
+ intentional quit
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Ctrl+C from a terminal delivers SIGINT to the process group. The Host
+often dies with exit 130 (or 143 for SIGTERM) before the Electron shell
+finishes quitting, and DesktopHostProcess previously routed that through
+onFailure → "DeepSeek Harness is unavailable". Mark 130/143 and
+SIGINT/SIGTERM closes as intentional teardown (same gate as stop()), and
+have the shell skip quit confirmation on terminal SIGINT/SIGTERM so the
+user gets a clean exit instead of crash + confirm dialogs.
+---
+ apps/desktop/src/host-process.ts        | 12 +++++++++++-
+ apps/desktop/src/main.ts                |  7 +++++++
+ apps/desktop/tests/host-process.spec.ts | 13 +++++++++++++
+ 3 files changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/apps/desktop/src/host-process.ts b/apps/desktop/src/host-process.ts
+index 948a88e6..4f05a220 100644
+--- a/apps/desktop/src/host-process.ts
++++ b/apps/desktop/src/host-process.ts
+@@ -50,6 +50,12 @@ export const QUIT_INSPECTION_DEADLINE_MS = 2_000
+ 
+ const MAX_HOST_DIAGNOSTIC_CHARS = 64 * 1024
+ 
++/** Exit codes / signals from an intentional terminal or shell teardown of the Host. */
++function isIntentionalHostShutdown(code: number | null, signal: NodeJS.Signals | null): boolean {
++  return signal === 'SIGINT' || signal === 'SIGTERM' || code === 130 || code === 143
++}
++
++
+ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
+   if (typeof message !== 'object' || message === null || !('type' in message)) return false
+   const candidate = message as Record<string, unknown>
+@@ -224,8 +230,12 @@ export class DesktopHostProcess {
+     })
+     child.once('error', (error) => { this.fail(error) })
+     this.exitPromise = new Promise<void>((resolve) => {
+-      child.once('close', (code) => {
++      child.once('close', (code, signal) => {
+         const suffix = this.stderr.trim() === '' ? '' : `: ${this.stderr.trim()}`
++        // Terminal Ctrl+C / kill deliver SIGINT/SIGTERM to the Host (often as exit
++        // 130/143) before or while the shell quits. Treat those as intentional
++        // teardown so onFailure does not open the "unavailable" crash dialog.
++        if (isIntentionalHostShutdown(code, signal)) this.stopping = true
+         if (code !== 0 && code !== null) this.fail(new Error(`dsh desktop host exited with ${String(code)}${suffix}`))
+         else this.fail(new Error(`dsh desktop host stopped${suffix}`))
+         resolve()
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 95684e6c..3316c830 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -94,6 +94,13 @@ function quitWithoutConfirmation(): void {
+   skipQuitConfirmation = true
+   app.quit()
+ }
++
++// Terminal SIGINT/SIGTERM (Ctrl+C, kill) must not open the quit-confirmation or
++// crash dialogs: skip confirmation and let before-quit run finishQuit. Host exit
++// 130/143 is handled separately in DesktopHostProcess as intentional shutdown.
++for (const signal of ['SIGINT', 'SIGTERM'] as const) {
++  process.on(signal, () => { quitWithoutConfirmation() })
++}
+ const recovery = new DesktopFatalRecovery({
+   messages: () => currentDesktopLocale().messages,
+   show: options => dialog.showMessageBox(options),
+diff --git a/apps/desktop/tests/host-process.spec.ts b/apps/desktop/tests/host-process.spec.ts
+index daeddc74..6e027fc2 100644
+--- a/apps/desktop/tests/host-process.spec.ts
++++ b/apps/desktop/tests/host-process.spec.ts
+@@ -162,6 +162,19 @@ describe('desktop host process', () => {
+     expect(failure).toHaveBeenCalledWith(new Error('dsh desktop host exited with 7: plugin crashed'))
+   })
+ 
++  it.each([130, 143] as const)('treats Host exit %s (SIGINT/SIGTERM) as intentional shutdown', async (code) => {
++    const runtime = projectWithHost(
++      "process.send({ type: 'ready', url: 'http://127.0.0.1:1/?token=fixture' });"
++      + `setTimeout(() => { process.exit(${code}) }, 20)`,
++    )
++    const failure = vi.fn()
++    const host = hostProcess(runtime, runtime, failure)
++    await host.start()
++    // Child self-exits with the signal convention; stop settles and onFailure stays quiet.
++    await host.stop()
++    expect(failure).not.toHaveBeenCalled()
++  })
++
+   it('retains only recent diagnostics from a noisy child', async () => {
+     const runtime = projectWithHost('process.stderr.write(\'discarded-prefix\' + \'x\'.repeat(70_000) + \'recent-failure\', () => { process.exitCode = 7; process.disconnect() })')
+     const failure = await hostProcess(runtime).start().catch((error: unknown) => error)
+-- 
+2.47.3
+

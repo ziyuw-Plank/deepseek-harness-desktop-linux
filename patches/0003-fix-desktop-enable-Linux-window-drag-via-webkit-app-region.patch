@@ -1,0 +1,350 @@
+From 373f7c26499ec027d6b5ba77544a46e2bd4cb87a Mon Sep 17 00:00:00 2001
+From: ziyuw-Plank <236070466+ziyuw-Plank@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 17:44:32 +0800
+Subject: [PATCH 1/2] fix(desktop): enable Linux window drag via
+ -webkit-app-region
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Linux primary windows use titleBarStyle:hidden without titleBarOverlay, but
+base.css only applied mark→drag rules under data-platform=darwin. On Wayland
+(and X11) that left a frameless window with no drag surface.
+
+Extend the darwin drag / recall / interactive no-drag rules to linux, and
+mirror the dockkit + conversation header cluster subtractions so controls and
+split dividers stay clickable. Onboarding dragBand geometry follows.
+---
+ apps/desktop/src/main.ts                      |  8 +++--
+ .../skeleton/ConversationRoot.module.css      | 23 ++++++-------
+ .../src/components/dockkit.module.css         | 32 +++++++++----------
+ .../tests/app-region-styles.client.spec.ts    | 28 ++++++++--------
+ .../src/client/OnboardingSurface.module.css   |  5 +--
+ .../tests/app-region-styles.client.spec.ts    |  8 ++---
+ packages/client/web/src/base.css              | 28 +++++++++-------
+ .../web/tests/base-styles.client.spec.ts      | 27 +++++++++-------
+ 8 files changed, 87 insertions(+), 72 deletions(-)
+
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 3faf3da3..95684e6c 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -222,9 +222,11 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
+       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
+         symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
+     } : {}),
+-    // Linux has no titleBarOverlay; the native frame would spend a whole bar on
+-    // the window title, so the window goes frameless and the client's own
+-    // chrome draws the controls (the drag regions it already owns).
++    // Linux has no titleBarOverlay path in this shell; the native frame would
++    // spend a whole bar on the window title, so the window goes frameless and
++    // the client's chrome owns drag via base.css mark→drag rules for
++    // data-platform=linux (same marks as darwin). Wayland/X11 both honor
++    // -webkit-app-region on Electron 44+.
+     ...(process.platform === 'linux' && primary ? { titleBarStyle: 'hidden' as const } : {}),
+     // hiddenInset places traffic lights inside the sidebar; sidebar vibrancy
+     // needs a transparent window background to show through the page.
+diff --git a/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css b/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css
+index 29a4d5e7..71ade4b0 100644
+--- a/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css
++++ b/packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css
+@@ -48,17 +48,18 @@
+   min-height: 0;
+ }
+ 
+-/* macOS hiddenInset titlebar: the header block owns the window drag over its
+-   own box — title row plus the view tab strip, so the draggable geometry is the
+-   header's geometry and no frame band has to match its height. The header marks
+-   itself `data-window-drag` (ConversationHeader); below it the title-row clusters
+-   subtract their whole boxes, and individual controls are covered by the base.css
+-   interactive-element rule. A covering overlay lives beside #root
+-   (ui-settings-general), which puts it after this row in document order. */
+-:global([data-platform='darwin']) .headerLeading,
+-:global([data-platform='darwin']) .headerActions,
+-:global([data-platform='darwin']) .headerUtilities,
+-:global([data-platform='darwin']) .headerCorner {
++/* Desktop hidden titlebar (macOS hiddenInset + Linux titleBarStyle:hidden): the
++   header block owns the window drag over its own box — title row plus the view
++   tab strip, so the draggable geometry is the header's geometry and no frame
++   band has to match its height. The header marks itself `data-window-drag`
++   (ConversationHeader); below it the title-row clusters subtract their whole
++   boxes, and individual controls are covered by the base.css interactive-element
++   rule. A covering overlay lives beside #root (ui-settings-general), which puts
++   it after this row in document order. */
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .headerLeading,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .headerActions,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .headerUtilities,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .headerCorner {
+   -webkit-app-region: no-drag;
+ }
+ 
+diff --git a/packages/client/ui-dockkit/src/components/dockkit.module.css b/packages/client/ui-dockkit/src/components/dockkit.module.css
+index 4896d2f5..6a630910 100644
+--- a/packages/client/ui-dockkit/src/components/dockkit.module.css
++++ b/packages/client/ui-dockkit/src/components/dockkit.module.css
+@@ -302,22 +302,22 @@
+   margin-left: 4px;
+ }
+ 
+-/* macOS desktop: an embedder may pin this surface at the window's top edge (the
+-   right sidebar does, in both presentations). The strip row is marked
+-   `data-window-drag` in markup (TabPanel), so ui-web base.css's single darwin
+-   rule drags it over its own box; the chip run, the strip-end chrome, the pane
+-   body, and the split divider subtract their whole boxes so tabs, controls,
+-   content, and the resize grab stay usable wherever they overlap that row. The
+-   divider must be named here: it is a plain div, so ui-web base.css's
+-   interactive-element subtraction never matches it. A floating pane subtracts its
+-   own box the same way, so the strip row never drags the window over it. Hidden
+-   surfaces contribute nothing: Blink skips non-visible boxes when it collects
+-   draggable regions. */
+-:global(html[data-platform='darwin']) .stripTabs,
+-:global(html[data-platform='darwin']) .stripChrome,
+-:global(html[data-platform='darwin']) .paneBody,
+-:global(html[data-platform='darwin']) .float,
+-:global(html[data-platform='darwin']) .divider {
++/* Desktop (macOS + Linux): an embedder may pin this surface at the window's top
++   edge (the right sidebar does, in both presentations). The strip row is marked
++   `data-window-drag` in markup (TabPanel), so ui-web base.css's mark→drag rule
++   drags it over its own box; the chip run, the strip-end chrome, the pane body,
++   and the split divider subtract their whole boxes so tabs, controls, content,
++   and the resize grab stay usable wherever they overlap that row. The divider
++   must be named here: it is a plain div, so ui-web base.css's interactive-element
++   subtraction never matches it. A floating pane subtracts its own box the same
++   way, so the strip row never drags the window over it. Hidden surfaces
++   contribute nothing: Blink skips non-visible boxes when it collects draggable
++   regions. */
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .stripTabs,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .stripChrome,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .paneBody,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .float,
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .divider {
+   -webkit-app-region: no-drag;
+ }
+ 
+diff --git a/packages/client/ui-dockkit/tests/app-region-styles.client.spec.ts b/packages/client/ui-dockkit/tests/app-region-styles.client.spec.ts
+index f0e1428a..6f8e4eb5 100644
+--- a/packages/client/ui-dockkit/tests/app-region-styles.client.spec.ts
++++ b/packages/client/ui-dockkit/tests/app-region-styles.client.spec.ts
+@@ -1,12 +1,13 @@
+ /**
+- * macOS app-region subtraction, asserted against dockkit.module.css on disk: an
+- * embedder may pin the surface at the window's top edge (the right sidebar does),
+- * so the strip row marks itself `data-window-drag` in markup (TabPanel) and ui-web
+- * base.css drags the row over its own box. Electron composes app-regions from
+- * geometry in DOM order — every box that must stay usable subtracts itself from
+- * that row. The divider must be listed explicitly: it is a plain div, so base.css's
+- * interactive-element subtraction never matches it, and an unsubtracted vertical
+- * divider's top run would drag the window instead of resizing the split.
++ * Desktop (macOS + Linux) app-region subtraction, asserted against
++ * dockkit.module.css on disk: an embedder may pin the surface at the window's top
++ * edge (the right sidebar does), so the strip row marks itself `data-window-drag`
++ * in markup (TabPanel) and ui-web base.css drags the row over its own box.
++ * Electron composes app-regions from geometry in DOM order — every box that must
++ * stay usable subtracts itself from that row. The divider must be listed
++ * explicitly: it is a plain div, so base.css's interactive-element subtraction
++ * never matches it, and an unsubtracted vertical divider's top run would drag the
++ * window instead of resizing the split.
+  */
+ import { readFileSync } from 'node:fs'
+ import { resolve } from 'node:path'
+@@ -31,7 +32,7 @@ it('keeps Windows floating headers 20px below the caption, including restored po
+   expect(css).toMatch(/:global\(html\[data-windows-titlebar\]\[data-fullscreen\]\) \.float\s*\{\s*--dsh-dockkit-float-top: 20px;/)
+ })
+ 
+-describe('macOS app-region ownership', () => {
++describe('desktop app-region ownership', () => {
+   it('subtracts the chip run, strip-end chrome, pane body, and divider, and declares no drag itself', () => {
+     // The strip row's drag is the markup mark's job: a sheet that declares it
+     // here would drag the same box twice and hide the row from the ownership gate.
+@@ -39,16 +40,17 @@ describe('macOS app-region ownership', () => {
+ 
+     const [selector, value] = regionRules[0]!
+     expect(value).toBe('no-drag')
++    const root = ":global(html:is([data-platform='darwin'], [data-platform='linux']))"
+     for (const part of ['.stripTabs', '.stripChrome', '.paneBody', '.divider']) {
+-      expect(selector, part).toContain(`:global(html[data-platform='darwin']) ${part}`)
++      expect(selector, part).toContain(`${root} ${part}`)
+     }
+   })
+ 
+-  it('scopes the subtraction to the darwin root', () => {
++  it('scopes the subtraction to the darwin/linux desktop root', () => {
+     // A floating panel lives beside #root, where ui-web base.css subtracts it, so
+-    // the strip's drag must never reach a non-macOS host.
++    // the strip's drag must never reach a plain web host.
+     for (const [selector] of regionRules) {
+-      expect(selector).toContain("html[data-platform='darwin']")
++      expect(selector).toContain("html:is([data-platform='darwin'], [data-platform='linux'])")
+     }
+   })
+ })
+diff --git a/packages/client/ui-settings-account/src/client/OnboardingSurface.module.css b/packages/client/ui-settings-account/src/client/OnboardingSurface.module.css
+index 0187a896..fec9dd9c 100644
+--- a/packages/client/ui-settings-account/src/client/OnboardingSurface.module.css
++++ b/packages/client/ui-settings-account/src/client/OnboardingSurface.module.css
+@@ -28,8 +28,9 @@
+   }
+ }
+ 
+-/* First child: later content and dialogs subtract their interactive regions. */
+-:global(html[data-platform='darwin']) .dragBand {
++/* First child: later content and dialogs subtract their interactive regions.
++   Sized on darwin and linux (frameless / hidden titlebar); Windows uses WCO. */
++:global(html:is([data-platform='darwin'], [data-platform='linux'])) .dragBand {
+   position: absolute;
+   inset: 8px;
+   pointer-events: none;
+diff --git a/packages/client/ui-theme/tests/app-region-styles.client.spec.ts b/packages/client/ui-theme/tests/app-region-styles.client.spec.ts
+index 8e50c20d..92965bef 100644
+--- a/packages/client/ui-theme/tests/app-region-styles.client.spec.ts
++++ b/packages/client/ui-theme/tests/app-region-styles.client.spec.ts
+@@ -19,11 +19,11 @@ import { fileURLToPath } from 'node:url'
+ import { describe, expect, it } from 'vitest'
+ import { packageFiles, packageStylesheets, parseRules, type CssRule } from './stylesheet-scan.ts'
+ 
+-/** The one stylesheet allowed to declare a darwin window drag region, relative to packages/. */
++/** The one stylesheet allowed to declare a desktop (darwin/linux) window drag region, relative to packages/. */
+ const SHELL_SHEET = 'client/web/src/base.css'
+ 
+ /** The mark that stylesheet's rule selects, as authored. */
+-const SHELL_DRAG_SELECTOR = "html[data-platform='darwin'] [data-window-drag]"
++const SHELL_DRAG_SELECTOR = "html:is([data-platform='darwin'], [data-platform='linux']) [data-window-drag]"
+ 
+ /** The frame's Windows caption row, relative to packages/; the other platform's chrome. */
+ const WINDOWS_CAPTION = 'client/ui-layout/src/client/AppFrame.module.css'
+@@ -240,9 +240,9 @@ describe('window drag-region ownership', () => {
+ 
+   it('declares the window drag surface in exactly two places', () => {
+     // Rows mark themselves instead of each sheet declaring its own drag, so the
+-    // tree holds one darwin rule — the mark rule in the shell sheet — plus the
++    // tree holds one darwin/linux mark→drag rule — in the shell sheet — plus the
+     // Windows caption row, which is that platform's own chrome. A third
+-    // declaration, a per-sheet row rule, or a darwin band on the frame fails here.
++    // declaration, a per-sheet row rule, or a fixed band on the frame fails here.
+     expect(dragOwners()).toEqual([
+       { file: WINDOWS_CAPTION, selectors: [WINDOWS_CAPTION_SELECTOR] },
+       { file: SHELL_SHEET, selectors: [SHELL_DRAG_SELECTOR] },
+diff --git a/packages/client/web/src/base.css b/packages/client/web/src/base.css
+index af74988c..871ae29f 100644
+--- a/packages/client/web/src/base.css
++++ b/packages/client/web/src/base.css
+@@ -44,15 +44,19 @@ html[data-platform='darwin'] body {
+   isolation: isolate;
+ }
+ 
+-/* macOS desktop: the one drag declaration. A chrome row marks itself in markup
+-   (`data-window-drag`) and its own box becomes its draggable geometry, so no fixed
+-   band has to match any row's height; the ui-theme app-region gate's CHROME_ROWS
+-   manifest is the list of rows that must carry the mark. Electron composes
+-   app-regions from geometry, not hit testing, so a surface covering a row would
+-   otherwise drag the window instead of receiving clicks; every covering overlay
+-   portals to document.body beside #root, which also puts it after every drag row
+-   in document order, and one rule subtracts them all. */
+-html[data-platform='darwin'] [data-window-drag] {
++/* Desktop (macOS + Linux): the one drag declaration. A chrome row marks itself in
++   markup (`data-window-drag`) and its own box becomes its draggable geometry, so
++   no fixed band has to match any row's height; the ui-theme app-region gate's
++   CHROME_ROWS manifest is the list of rows that must carry the mark. Electron
++   composes app-regions from geometry, not hit testing, so a surface covering a
++   row would otherwise drag the window instead of receiving clicks; every covering
++   overlay portals to document.body beside #root, which also puts it after every
++   drag row in document order, and one rule subtracts them all.
++   Linux primary windows use titleBarStyle:'hidden' without titleBarOverlay (see
++   apps/desktop createWindow), so these same mark→drag rules are what make the
++   custom chrome movable — including under Wayland. Windows keeps its own
++   titleBarOverlay caption path and does not use this rule. */
++html:is([data-platform='darwin'], [data-platform='linux']) [data-window-drag] {
+   -webkit-app-region: drag;
+ }
+ 
+@@ -64,11 +68,11 @@ html[data-platform='darwin'] [data-window-drag] {
+    is the body's own: the row marks inside still declare drag and win over it in
+    document order, so the pulse changes nothing about the composed surface — it
+    only makes Electron collect it again. */
+-html[data-platform='darwin'] [data-window-drag-recall] {
++html:is([data-platform='darwin'], [data-platform='linux']) [data-window-drag-recall] {
+   -webkit-app-region: no-drag;
+ }
+ 
+-html[data-platform='darwin'] body > :not(#root) {
++html:is([data-platform='darwin'], [data-platform='linux']) body > :not(#root) {
+   -webkit-app-region: no-drag;
+ }
+ 
+@@ -79,7 +83,7 @@ html[data-platform='darwin'] body > :not(#root) {
+    content container, which would override every overlay mounted earlier in the
+    DOM. One selector on the native elements, ARIA roles, and tabindexed custom
+    widgets replaces per-component no-drag opt-outs. */
+-html[data-platform='darwin'] :is(
++html:is([data-platform='darwin'], [data-platform='linux']) :is(
+   button, a, input, select, textarea, summary, [contenteditable='true'], [tabindex],
+   [role='dialog'], [role='alertdialog'], [role='menu'], [role='listbox'], [role='tooltip'],
+   [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='menuitemcheckbox'],
+diff --git a/packages/client/web/tests/base-styles.client.spec.ts b/packages/client/web/tests/base-styles.client.spec.ts
+index 6f4c9b81..f6b67ea6 100644
+--- a/packages/client/web/tests/base-styles.client.spec.ts
++++ b/packages/client/web/tests/base-styles.client.spec.ts
+@@ -1,6 +1,6 @@
+ /**
+  * Shell base styles stay independent from the dynamically loaded theme bundle,
+- * and the shell sheet is where the darwin window drag surface is declared.
++ * and the shell sheet is where the desktop (darwin/linux) window drag surface is declared.
+  */
+ import { readFileSync } from 'node:fs'
+ import { fileURLToPath } from 'node:url'
+@@ -32,6 +32,7 @@ const literalContentSelectors = [
+   '[data-search]',
+   '[data-terminal]',
+ ]
++const desktopRoot = "html:is([data-platform='darwin'], [data-platform='linux'])"
+ 
+ describe('web shell base.css', () => {
+   it('leaves theme styles to the dynamic ui-theme client entry', () => {
+@@ -40,22 +41,26 @@ describe('web shell base.css', () => {
+   })
+ 
+   it('declares exactly the interactive subtraction the drag contract publishes', () => {
+-    // One source for the selector: the model constant. The darwin rule must
+-    // declare the same list, so a new interactive role is added in one place
+-    // and a drift between the sheet and the composition model fails here.
+-    const rule = /html\[data-platform='darwin'\] :is\(([^)]*)\)\s*\{[^}]*app-region:\s*no-drag/.exec(normalizedCss)
+-    expect(rule, 'base.css declares no darwin interactive no-drag rule').not.toBeNull()
+-    const declared = rule![1]!.split(',').map(part => part.trim()).join(', ')
++    // One source for the selector: the model constant. The desktop (darwin/linux)
++    // rule must declare the same list, so a new interactive role is added in one
++    // place and a drift between the sheet and the composition model fails here.
++    const prefix = `${desktopRoot} :is(`
++    const start = normalizedCss.indexOf(prefix)
++    expect(start, 'base.css declares no desktop interactive no-drag rule').toBeGreaterThan(-1)
++    const open = start + prefix.length
++    const close = normalizedCss.indexOf(')', open)
++    expect(normalizedCss.slice(close, close + 80)).toMatch(/\{\s*-webkit-app-region:\s*no-drag/)
++    const declared = normalizedCss.slice(open, close).split(',').map(part => part.trim()).join(', ')
+     expect(declared).toBe(INTERACTIVE_SELECTOR)
+   })
+ 
+-  it('declares the darwin drag surface through the mark chrome rows set', () => {
++  it('declares the desktop drag surface through the mark chrome rows set', () => {
+     // One rule for the whole surface: a chrome row marks itself
+     // `data-window-drag`, so its own box is the draggable geometry and no sheet
+     // has to declare drag per row. The ui-theme app-region gate holds the other
+-    // half — that this is the only darwin drag rule in the package tree.
++    // half — that this is the only darwin/linux mark→drag rule in the package tree.
+     expect(normalizedCss).toContain(
+-      "html[data-platform='darwin'] [data-window-drag] { -webkit-app-region: drag; }",
++      `${desktopRoot} [data-window-drag] { -webkit-app-region: drag; }`,
+     )
+   })
+ 
+@@ -66,7 +71,7 @@ describe('web shell base.css', () => {
+     // marks inside it still win in document order, so the pulse changes what
+     // Electron collects without changing the composed surface.
+     expect(normalizedCss).toContain(
+-      "html[data-platform='darwin'] [data-window-drag-recall] { -webkit-app-region: no-drag; }",
++      `${desktopRoot} [data-window-drag-recall] { -webkit-app-region: no-drag; }`,
+     )
+   })
+ 
+-- 
+2.47.3
+
